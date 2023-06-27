@@ -43,34 +43,45 @@ public class MLServer {
             for(License lic: licenses){
                 if(lic.LicenseUserName.equals(username)) {
                     if(generateLicenseKey(username).equals(licenseKey)) {
-                        //TODO: add IP validation pamietac o 'any'
-                        if(lic.License == 0) {
-                            return "Error! Number of license activations exhausted";
+                        boolean flagIpOnWhitelist = false;
+                        for(String ipAddr : lic.IPaddresses) {
+                            if(ipAddr.equals(ipAddress)) {
+                                flagIpOnWhitelist = true;
+                                break;
+                            }
+                        }
+                        if(!flagIpOnWhitelist) {
+                            return "Error! IP is not whitelisted";
                         } else {
-                            GrantedLicense newLicense = new GrantedLicense(ipAddress, Instant.now().getEpochSecond() + lic.ValidationTime);
-                            if(activeLicenses.containsKey(username)) {
-                                boolean added_flag = false;
-                                for(GrantedLicense license : activeLicenses.get(username)) {
-                                    if(license.getIPaddress().equals(ipAddress)) {
-                                        license.setValidUntil(Instant.now().getEpochSecond() + lic.ValidationTime);
-                                        added_flag = true;
-                                        break;
+                            if (lic.License == 0) {
+                                return "Error! Number of license activations exhausted";
+                            } else {
+                                GrantedLicense newLicense = new GrantedLicense(ipAddress, Instant.now().getEpochSecond() + lic.ValidationTime);
+                                if (activeLicenses.containsKey(username)) {
+                                    boolean added_flag = false;
+                                    for (GrantedLicense license : activeLicenses.get(username)) {
+                                        if (license.getIPaddress().equals(ipAddress)) {
+                                            license.setValidUntil(Instant.now().getEpochSecond() + lic.ValidationTime);
+                                            added_flag = true;
+                                            break;
+                                        }
                                     }
-                                }
-                                if(!added_flag) {
-                                    activeLicenses.get(username).add(newLicense);
+                                    if (!added_flag) {
+                                        activeLicenses.get(username).add(newLicense);
+                                        lic.License -= 1;
+                                    }
+                                } else {
+                                    ArrayList<GrantedLicense> newLicenseListForUsername = new ArrayList() {
+                                    };
+                                    newLicenseListForUsername.add(newLicense);
+                                    activeLicenses.put(username, newLicenseListForUsername);
                                     lic.License -= 1;
                                 }
-                            } else {
-                                ArrayList<GrantedLicense> newLicenseListForUsername = new ArrayList(){};
-                                newLicenseListForUsername.add(newLicense);
-                                activeLicenses.put(username, newLicenseListForUsername);
-                                lic.License -= 1;
-                            }
-                            if(lic.ValidationTime == 0) {
-                                return OffsetDateTime.now().format(df);
-                            } else {
-                                return OffsetDateTime.now().plusSeconds(lic.ValidationTime).format(df);
+                                if (lic.ValidationTime == 0) {
+                                    return OffsetDateTime.now().format(df);
+                                } else {
+                                    return OffsetDateTime.now().plusSeconds(lic.ValidationTime).format(df);
+                                }
                             }
                         }
                     } else {
@@ -115,7 +126,7 @@ public class MLServer {
         System.out.println("Starting server...");
         try {
             serverSocket = new ServerSocket();
-            serverSocket.setSoTimeout(10000);
+            serverSocket.setSoTimeout(5000);
             SocketAddress socketAddress = new InetSocketAddress("0.0.0.0", this.tcpPort);
             serverSocket.bind(socketAddress);
         } catch (IOException e) {
@@ -137,7 +148,7 @@ public class MLServer {
                 } else if(input.equals("p")) {
                     synchronized (licensesSyncObject) {
                         activeLicenses.forEach((k,v) -> {
-                            System.out.println("License username: " + k + "| Licenses used: " + v.size());
+                            System.out.println("License username: " + k + " | Licenses used: " + v.size());
                             v.forEach(gl -> {
                                 System.out.println("\tIPAddr: " + gl.getIPaddress() + " | License Valid For (seconds) " + (gl.getValidUntil() - Instant.now().getEpochSecond()));
                             });
