@@ -1,5 +1,5 @@
 package Server;
 
-public class Payload {
+public class LicenseJsonModel {
     public License[] payload;
 }

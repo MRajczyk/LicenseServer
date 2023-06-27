@@ -1,5 +1,6 @@
 package Server;
 
+import java.util.InputMismatchException;
 import java.util.Scanner;
 
 public class MLServerMain {
@@ -8,9 +9,18 @@ public class MLServerMain {
         MLServer MLServer = new MLServer();
         MLServer.loadLicenses();
 
-        System.out.println("Enter port on which the server shall listen to incoming calls");
         Scanner scanner = new Scanner(System.in);
-        Integer port = scanner.nextInt();
+        while(true) {
+            System.out.println("Enter port on which the server shall listen to incoming calls");
+            int port;
+            try {
+                port = Integer.parseInt(scanner.nextLine());
+                MLServer.setTcpPort(port);
+                break;
+            } catch (NumberFormatException e) {
+                System.out.println("Invalid input, try again.");
+            }
+        }
 
         MLServer.start();
     }
