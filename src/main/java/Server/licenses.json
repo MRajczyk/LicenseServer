@@ -1,21 +1,21 @@
 {
   "payload": [
     {
-      "LicenceUserName": "Radek",
-      "Licence": 2,
-      "IPadresses": ["10.0.0.0/24", "192.168.1.0/24"],
+      "LicenseUserName": "Radek",
+      "License": 2,
+      "IPaddresses": ["10.0.0.0/24", "192.168.1.0/24"],
       "ValidationTime": 600
     },
     {
-      "LicenceUserName": "Guest",
-      "Licence": 1,
-      "IPadresses": ["192.168.1.0/24"],
+      "LicenseUserName": "Guest",
+      "License": 1,
+      "IPaddresses": ["192.168.1.0/24"],
       "ValidationTime": 120
     },
     {
-      "LicenceUserName": "Admin",
-      "Licence": 0,
-      "IPadresses": ["any"],
+      "LicenseUserName": "Admin",
+      "License": 0,
+      "IPaddresses": ["any"],
       "ValidationTime": 0
     }
   ]
