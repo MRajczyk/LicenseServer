@@ -30,10 +30,6 @@ public class MLServer {
 
     DateTimeFormatter df = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
 
-    public Object getLicensesSyncObject() {
-        return licensesSyncObject;
-    }
-
     public String generateLicenseKey(String username) {
         Hasher hasher = Hashing.md5().newHasher();
         hasher.putString(username, StandardCharsets.UTF_8);
@@ -56,7 +52,7 @@ public class MLServer {
                                 boolean added_flag = false;
                                 for(GrantedLicense license : activeLicenses.get(username)) {
                                     if(license.getIPaddress().equals(ipAddress)) {
-                                        license.setValidUntil(lic.ValidationTime);
+                                        license.setValidUntil(Instant.now().getEpochSecond() + lic.ValidationTime);
                                         added_flag = true;
                                         break;
                                     }
@@ -71,7 +67,6 @@ public class MLServer {
                                 activeLicenses.put(username, newLicenseListForUsername);
                                 lic.License -= 1;
                             }
-                            OffsetDateTime.now().toString();
                             if(lic.ValidationTime == 0) {
                                 return OffsetDateTime.now().format(df);
                             } else {
@@ -112,10 +107,6 @@ public class MLServer {
         }
     }
 
-    private void updateLicenses() {
-
-    }
-
     public void setTcpPort(Integer tcpPort) {
         this.tcpPort = tcpPort;
     }
@@ -130,6 +121,7 @@ public class MLServer {
         } catch (IOException e) {
             System.out.println("Error while binding address, ");
         }
+        System.out.println("Server is running..");
 
         //thread to get user input so nothing blocks
         Runnable inputListener = () -> {
@@ -144,8 +136,12 @@ public class MLServer {
                     }
                 } else if(input.equals("p")) {
                     synchronized (licensesSyncObject) {
-                        //print
-                        System.out.println("print placeholder");
+                        activeLicenses.forEach((k,v) -> {
+                            System.out.println("License username: " + k + "| Licenses used: " + v.size());
+                            v.forEach(gl -> {
+                                System.out.println("\tIPAddr: " + gl.getIPaddress() + " | License Valid For (seconds) " + (gl.getValidUntil() - Instant.now().getEpochSecond()));
+                            });
+                        });
                     }
                 } else if(input.equals("s")) {
                     System.out.println(this.tcpPort);
@@ -155,26 +151,67 @@ public class MLServer {
         Thread userInputThread = new Thread(inputListener);
         userInputThread.start();
 
-//        for(License lic: licenses) {
-//            System.out.println(lic.LicenseUserName + " " + this.generateLicenseKey(lic.LicenseUserName));
-//        }
+        for(License lic: licenses) {
+            System.out.println(lic.LicenseUserName + " " + this.generateLicenseKey(lic.LicenseUserName));
+        }
 
-        while(true) {
-            try {
-                Socket clientSocket = this.serverSocket.accept();
-                //ustawic na nieblokujace czy cos, idk jak
-                MLSClientHandler handler = new MLSClientHandler(clientSocket, this);
-                Thread thread = new Thread(handler);
-                thread.start();
-            } catch(SocketTimeoutException e) {
+        //update licenses
+        Runnable licenseUpdater = () -> {
+            while(true) {
                 synchronized (shutdownSyncObject) {
                     if(shutdownFlag) {
                         return;
                     }
                 }
+                synchronized (licensesSyncObject) {
+                    ArrayList<String> keysToBeDeleted = new ArrayList<>();
+                    activeLicenses.forEach((k,v) -> {
+                        ArrayList<GrantedLicense> licensesToBeRemoved = new ArrayList<>();
+                        for (GrantedLicense grantedLicense : v) {
+                            //if not valid anymore, delete from licenses and re-add to licenses list
+                            if(grantedLicense.getValidUntil() < Instant.now().getEpochSecond()) {
+                                licensesToBeRemoved.add(grantedLicense);
+                                for(License license : licenses) {
+                                    if(license.LicenseUserName.equals(k)) {
+                                        license.License += 1;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        licensesToBeRemoved.forEach(v::remove);
+                        if(v.size() == 0) {
+                            keysToBeDeleted.add(k);
+                        }
+                    });
+                    keysToBeDeleted.forEach(key -> {
+                        activeLicenses.remove(key);
+                    });
+                }
+                try {
+                    Thread.sleep(569);
+                } catch (InterruptedException e) {
+                    System.out.println("Error with sleeping thread..zzz...");
+                }
+            }
+        };
+        Thread updateLicensesThread = new Thread(licenseUpdater);
+        updateLicensesThread.start();
+
+        while(true) {
+            synchronized (shutdownSyncObject) {
+                if(shutdownFlag) {
+                    return;
+                }
+            }
+            try {
+                Socket clientSocket = this.serverSocket.accept();
+                MLSClientHandler handler = new MLSClientHandler(clientSocket, this);
+                Thread thread = new Thread(handler);
+                thread.start();
             }
             catch (IOException e) {
-                System.out.println("Failed to set timeout time on socket for new connection");
+                //expected
             }
         }
     }

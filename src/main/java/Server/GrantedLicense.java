@@ -21,7 +21,7 @@ public class GrantedLicense {
         return validUntil;
     }
 
-    public void setValidUntil(Integer validUntil) {
+    public void setValidUntil(long validUntil) {
         this.validUntil = validUntil;
     }
 }

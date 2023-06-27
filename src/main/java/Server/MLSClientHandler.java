@@ -8,7 +8,7 @@ import java.net.*;
 public class MLSClientHandler implements Runnable {
     private final Socket clientSocket;
     private final char[] buffer = new char[1024];
-    private MLServer serverInstance;
+    private final MLServer serverInstance;
 
     MLSClientHandler(Socket socket, MLServer server) {
         this.clientSocket = socket;
