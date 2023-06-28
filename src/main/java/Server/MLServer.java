@@ -140,23 +140,26 @@ public class MLServer {
                 System.out.println("Enter p(rint), q(uit) or s(how port)");
                 Scanner sc = new Scanner(System.in);
                 String input = sc.nextLine();
-                if (input.equals("q")) {
-                    synchronized (shutdownSyncObject) {
-                        shutdownFlag = true;
-                        System.out.println("Shutting down. Waiting for socket to release the lock\n\tProgram will exit shortly...");
-                        return;
-                    }
-                } else if(input.equals("p")) {
-                    synchronized (licensesSyncObject) {
-                        activeLicenses.forEach((k,v) -> {
-                            System.out.println("License username: " + k + " | Licenses used: " + v.size());
-                            v.forEach(gl -> {
-                                System.out.println("\tIPAddr: " + gl.getIPaddress() + " | License Valid For (seconds) " + (gl.getValidUntil() - Instant.now().getEpochSecond()));
+                switch (input) {
+                    case "q":
+                        synchronized (shutdownSyncObject) {
+                            shutdownFlag = true;
+                            System.out.println("Shutting down. Waiting for socket to release the lock\n\tProgram will exit shortly...");
+                            return;
+                        }
+                    case "p":
+                        synchronized (licensesSyncObject) {
+                            activeLicenses.forEach((k, v) -> {
+                                System.out.println("License username: " + k + " | Licenses used: " + v.size());
+                                v.forEach(gl -> {
+                                    System.out.println("\tIPAddr: " + gl.getIPaddress() + " | License Valid For (seconds) " + (gl.getValidUntil() - Instant.now().getEpochSecond()));
+                                });
                             });
-                        });
-                    }
-                } else if(input.equals("s")) {
-                    System.out.println(this.tcpPort);
+                        }
+                        break;
+                    case "s":
+                        System.out.println(this.tcpPort);
+                        break;
                 }
             }
         };
