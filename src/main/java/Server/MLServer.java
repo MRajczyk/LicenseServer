@@ -143,6 +143,7 @@ public class MLServer {
                 if (input.equals("q")) {
                     synchronized (shutdownSyncObject) {
                         shutdownFlag = true;
+                        System.out.println("Shutting down. Waiting for socket to release the lock\n\tProgram will exit shortly...");
                         return;
                     }
                 } else if(input.equals("p")) {
