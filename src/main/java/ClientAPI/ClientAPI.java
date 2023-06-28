@@ -2,6 +2,12 @@ package ClientAPI;
 import com.google.gson.Gson;
 import java.io.*;
 import java.net.Socket;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.Period;
+import java.time.format.DateTimeFormatter;
+import java.util.Scanner;
 
 public class ClientAPI {
     private String licenseUsername;
@@ -11,16 +17,12 @@ public class ClientAPI {
     private Integer serverPort;
 
     private Socket clientSocket;
+    Thread tokenRenewerThread;
 
     private final Object serverInfoSyncObject = new Object();
     private final Object shutdownSyncObject = new Object();
+    private final Object tokenSyncObject = new Object();
     private Boolean shutdownFlag = false;
-
-//    synchronized (shutdownSyncObject) {
-//        if(shutdownFlag) {
-//            return;
-//        }
-//    }
 
     public void start() {
     //find server in local network
@@ -53,6 +55,7 @@ public class ClientAPI {
 
     private TokenModel sendLicenseToServer() {
         try {
+            System.out.println("Sending request to MLServer: " + LocalDateTime.now());
             clientSocket = new Socket(this.serverIP, this.serverPort);
             clientSocket.setSoTimeout(5000);
             BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
@@ -69,11 +72,10 @@ public class ClientAPI {
             int read = bufferedReader.read(buffer);
             String clientMsg = new String(buffer, 0, read);
 
-            //process license
             Gson gson = new Gson();
             return gson.fromJson(clientMsg, TokenModel.class);
         } catch (IOException e) {
-            return new TokenModel(this.licenseUsername, false, "Could not connect to MLServer");
+            return new TokenModel(this.licenseUsername, false, "Error! Could not connect to MLServer");
         }
         finally {
             try {
@@ -85,18 +87,66 @@ public class ClientAPI {
     }
 
     public TokenModel GetLicenseToken() {
-        if(this.token == null) {
-            TokenModel returnedToken = this.sendLicenseToServer();
-            //start refreshing thread
-            this.token = returnedToken;
+        synchronized (tokenSyncObject) {
+            if (this.token == null) {
+                this.token = this.sendLicenseToServer();
+                if (this.token.License) {
+                    Runnable tokenRenewer = () -> {
+                        try {
+                            while (true) {
+                                long secondsToWait;
+                                if (this.token == null || this.token.Expired.startsWith("Error!")) {
+                                    secondsToWait = 60;
+                                } else {
+                                    DateTimeFormatter format = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
+                                    LocalDateTime dateFromToken = LocalDateTime.parse(this.token.Expired, format);
+                                    LocalDateTime dateNow = LocalDateTime.now();
+                                    if (dateNow.isAfter(dateFromToken)) {
+                                        //should never happen
+                                        secondsToWait = 60;
+                                    } else {
+                                        Duration duration = Duration.between(dateNow, dateFromToken);
+                                        secondsToWait = duration.getSeconds();
+                                    }
+                                }
+                                Thread.sleep(secondsToWait * 1000);
+                                synchronized (shutdownSyncObject) {
+                                    if (this.shutdownFlag) {
+                                        return;
+                                    }
+                                }
+                                synchronized (tokenSyncObject) {
+                                    this.token = this.sendLicenseToServer();
+                                }
+                            }
+                        } catch (InterruptedException e) {
+                            System.out.println("License-renewing thread shutting down.");
+                        }
+                    };
+                    tokenRenewerThread = new Thread(tokenRenewer);
+                    tokenRenewerThread.start();
+                }
+                return this.token;
+            }
         }
-
+        DateTimeFormatter format = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
+        LocalDateTime tokenValidDate = LocalDateTime.parse(this.token.Expired, format);
+        LocalDateTime now = LocalDateTime.now();
+        synchronized (tokenSyncObject) {
+            if (this.token.License && (now.isBefore(tokenValidDate) || tokenValidDate.isEqual(now))) {
+                System.out.println("licence validity NOT refreshed, state returned!");
+            } else if (!this.token.License || now.isAfter(tokenValidDate)) {
+                this.token = sendLicenseToServer();
+                return this.token;
+            }
+        }
         return this.token;
     }
 
-    public void Stop() {
+    public void stop() {
         synchronized (shutdownSyncObject) {
             this.shutdownFlag = true;
+            tokenRenewerThread.interrupt();
         }
 
         synchronized (serverInfoSyncObject) {

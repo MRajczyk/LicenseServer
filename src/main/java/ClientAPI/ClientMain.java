@@ -2,7 +2,7 @@ package ClientAPI;
 import java.util.Scanner;
 
 public class ClientMain {
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
         ClientAPI api = new ClientAPI();
         int port;
         String serverIP;
@@ -30,7 +30,11 @@ public class ClientMain {
 
         api.setLicence("Radek", "9f3a08745c23449a53fc05d68eda1e1b");
         TokenModel licenseToken = api.GetLicenseToken();
-
         System.out.println(licenseToken.LicenseUserName + " " + licenseToken.License + " " + licenseToken.Expired);
+        Thread.sleep(3000);
+        licenseToken = api.GetLicenseToken();
+        System.out.println(licenseToken.LicenseUserName + " " + licenseToken.License + " " + licenseToken.Expired);
+
+        api.stop();
     }
 }
