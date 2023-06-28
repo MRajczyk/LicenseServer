@@ -4,11 +4,8 @@ import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.Period;
 import java.time.format.DateTimeFormatter;
-import java.util.Scanner;
 
 public class ClientAPI {
     private String licenseUsername;
@@ -48,7 +45,6 @@ public class ClientAPI {
                     ms.send(dp);
                     ms.close();
                 } catch (IOException e) {
-                    e.printStackTrace();
                     System.out.println("Error occured while sending mutlicast message");
                     return;
                 }
@@ -124,7 +120,7 @@ public class ClientAPI {
 
     private TokenModel sendLicenseToServer() {
         try {
-            System.out.println("Sending request to MLServer: " + LocalDateTime.now());
+            //System.out.println("Sending request to MLServer: " + LocalDateTime.now());
             clientSocket = new Socket(this.serverIP, this.serverPort);
             clientSocket.setSoTimeout(5000);
             BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
@@ -154,7 +150,9 @@ public class ClientAPI {
         }
         finally {
             try {
-                clientSocket.close();
+                if(clientSocket != null) {
+                    clientSocket.close();
+                }
             } catch (IOException e) {
                 //
             }
@@ -171,7 +169,7 @@ public class ClientAPI {
                             while (true) {
                                 long secondsToWait;
                                 if (this.token == null || this.token.Expired.startsWith("Error!")) {
-                                    secondsToWait = 60;
+                                    secondsToWait = 10;
                                 } else {
                                     DateTimeFormatter format = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
                                     LocalDateTime dateFromToken = LocalDateTime.parse(this.token.Expired, format);
@@ -181,7 +179,7 @@ public class ClientAPI {
                                         secondsToWait = 60;
                                     } else {
                                         Duration duration = Duration.between(dateNow, dateFromToken);
-                                        secondsToWait = duration.getSeconds();
+                                        secondsToWait = duration.getSeconds() + 2;
                                     }
                                 }
                                 Thread.sleep(secondsToWait * 1000);
@@ -191,7 +189,9 @@ public class ClientAPI {
                                     }
                                 }
                                 synchronized (tokenSyncObject) {
+                                    System.out.println("Refreshing license");
                                     this.token = this.sendLicenseToServer();
+                                    System.out.println(this.token.LicenseUserName + " " + this.token.License + " " + this.token.Expired);
                                 }
                             }
                         } catch (InterruptedException e) {
@@ -215,7 +215,7 @@ public class ClientAPI {
         LocalDateTime now = LocalDateTime.now();
         synchronized (tokenSyncObject) {
             if (this.token.License && (now.isBefore(tokenValidDate) || tokenValidDate.isEqual(now))) {
-                System.out.println("licence validity NOT refreshed, state returned!");
+                System.out.println("licence still valid - its validity was not refreshed");
             } else if (now.isAfter(tokenValidDate)) {
                 this.token = sendLicenseToServer();
                 return this.token;

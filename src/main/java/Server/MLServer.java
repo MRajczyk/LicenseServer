@@ -177,7 +177,7 @@ public class MLServer {
                 try {
                     if(!message.startsWith("DISCOVER")) {
                         MulticastSocket ms = new MulticastSocket();
-                        buff = ("nicht werken!").getBytes(StandardCharsets.UTF_8);
+                        buff = ("INCORRECT REQUEST").getBytes(StandardCharsets.UTF_8);
                         DatagramPacket dp = new DatagramPacket(buff, buff.length, InetAddress.getByName("230.0.0.0"), 2323);
                         ms.setTimeToLive(10);
                         ms.send(dp);
@@ -273,7 +273,7 @@ public class MLServer {
                     });
                 }
                 try {
-                    Thread.sleep(569);
+                    Thread.sleep(10);
                 } catch (InterruptedException e) {
                     //
                 }

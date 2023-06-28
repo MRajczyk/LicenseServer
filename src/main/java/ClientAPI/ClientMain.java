@@ -17,7 +17,7 @@ public class ClientMain {
                     if(api.discoverMLServer()) {
                         api.start(api.getServerIPFromUDP(), api.getServerPortFromUDP());
                     }
-                } else {
+                } else if (answer == 1) {
                     portLoop:
                     while(true) {
                         System.out.println("Enter port for TCP connection");
@@ -37,6 +37,9 @@ public class ClientMain {
                             System.out.println("Invalid input, try again.");
                         }
                     }
+                } else {
+                    System.out.println("Incorrect input. Try again");
+                    continue;
                 }
                 break;
             } catch (NumberFormatException e) {
@@ -47,9 +50,10 @@ public class ClientMain {
         api.setLicence("Guest", "adb831a7fdd83dd1e2a309ce7591dff8");
         TokenModel licenseToken = api.GetLicenseToken();
         System.out.println(licenseToken.LicenseUserName + " " + licenseToken.License + " " + licenseToken.Expired);
-        Thread.sleep(10000);
+        Thread.sleep(6000);
         licenseToken = api.GetLicenseToken();
         System.out.println(licenseToken.LicenseUserName + " " + licenseToken.License + " " + licenseToken.Expired);
+        Thread.sleep(18000);
 
         api.stop();
     }
