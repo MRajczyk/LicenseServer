@@ -1,7 +1,8 @@
 package ClientAPI;
 import com.google.gson.Gson;
 import java.io.*;
-import java.net.Socket;
+import java.net.*;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -15,6 +16,8 @@ public class ClientAPI {
     private TokenModel token;
     private String serverIP;
     private Integer serverPort;
+    private String serverIPFromUDP;
+    private Integer serverPortFromUDP;
 
     private Socket clientSocket;
     Thread tokenRenewerThread;
@@ -24,11 +27,77 @@ public class ClientAPI {
     private final Object tokenSyncObject = new Object();
     private Boolean shutdownFlag = false;
 
-    public void start() {
+    Thread udpThread;
+
+    public boolean discoverMLServer() {
     //find server in local network
-        synchronized (serverInfoSyncObject) {
-            //TODO: UDP
+        try {
+            Runnable udpListener = () -> {
+                synchronized (shutdownSyncObject) {
+                    if (shutdownFlag) {
+                        return;
+                    }
+                }
+                byte[] buff = new byte[1024];
+                //send discover request
+                try {
+                    MulticastSocket ms = new MulticastSocket();
+                    buff = ("DISCOVER").getBytes(StandardCharsets.UTF_8);
+                    DatagramPacket dp = new DatagramPacket(buff, buff.length, InetAddress.getByName("230.0.0.0"), 2323);
+                    ms.setTimeToLive(10);
+                    ms.send(dp);
+                    ms.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    System.out.println("Error occured while sending mutlicast message");
+                    return;
+                }
+                //receive
+                buff = new byte[1024];
+                int mcPort = 2323;
+                MulticastSocket udpSocket;
+                String message;
+                try {
+                    udpSocket = new MulticastSocket(null);
+                    udpSocket.setReuseAddress(true);
+                    InetSocketAddress address = new InetSocketAddress("0.0.0.0", mcPort);
+                    udpSocket.bind(address);
+                    udpSocket.setSoTimeout(10000);
+                    udpSocket.joinGroup(InetAddress.getByName("230.0.0.0"));
+                } catch (IOException e) {
+                    System.out.println("Error occured while binding multicast receiver socket! Thread shutdown.");
+                    return;
+                }
+                DatagramPacket pack = new DatagramPacket(buff, buff.length);
+                try {
+                    udpSocket.receive(pack);
+                    message = new String(buff, StandardCharsets.UTF_8);
+                } catch (IOException e) {
+                    udpSocket.close();
+                    System.out.println("Error occured while getting message from server! Thread shutdown.");
+                    return;
+                }
+
+                if (message.startsWith("PORT")) {
+                    synchronized (serverInfoSyncObject) {
+                        try {
+                            this.serverPortFromUDP = Integer.parseInt(message.substring(0, 9).split(":")[1]);
+                            this.serverIPFromUDP = pack.getAddress().toString().substring(1);
+                            System.out.println(this.serverIPFromUDP + ":" + this.serverPortFromUDP);
+                        } catch (NumberFormatException e) {
+                            System.out.println("Incorrect tcp received from server! Thread shutdown.");
+                        }
+                    }
+                }
+            };
+            udpThread = new Thread(udpListener);
+            udpThread.start();
+            udpThread.join();
+        } catch (InterruptedException e) {
+            System.out.println("UDP-resolving thread shutting down");
+            return false;
         }
+        return this.serverIPFromUDP != null && !this.serverIPFromUDP.equals("");
     }
 
     public void start(String serverIP, Integer serverPort) {
@@ -73,7 +142,13 @@ public class ClientAPI {
             String clientMsg = new String(buffer, 0, read);
 
             Gson gson = new Gson();
-            return gson.fromJson(clientMsg, TokenModel.class);
+            TokenModel response = gson.fromJson(clientMsg, TokenModel.class);
+            if(!response.License) {
+                TokenModelError errorResponse = gson.fromJson(clientMsg, TokenModelError.class);
+                return new TokenModel(errorResponse.LicenseUserName, errorResponse.License, errorResponse.Description);
+            } else {
+                return response;
+            }
         } catch (IOException e) {
             return new TokenModel(this.licenseUsername, false, "Error! Could not connect to MLServer");
         }
@@ -129,13 +204,19 @@ public class ClientAPI {
                 return this.token;
             }
         }
+        synchronized (tokenSyncObject) {
+            if (!this.token.License) {
+                this.token = sendLicenseToServer();
+                return this.token;
+            }
+        }
         DateTimeFormatter format = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
         LocalDateTime tokenValidDate = LocalDateTime.parse(this.token.Expired, format);
         LocalDateTime now = LocalDateTime.now();
         synchronized (tokenSyncObject) {
             if (this.token.License && (now.isBefore(tokenValidDate) || tokenValidDate.isEqual(now))) {
                 System.out.println("licence validity NOT refreshed, state returned!");
-            } else if (!this.token.License || now.isAfter(tokenValidDate)) {
+            } else if (now.isAfter(tokenValidDate)) {
                 this.token = sendLicenseToServer();
                 return this.token;
             }
@@ -146,7 +227,10 @@ public class ClientAPI {
     public void stop() {
         synchronized (shutdownSyncObject) {
             this.shutdownFlag = true;
-            tokenRenewerThread.interrupt();
+            if(tokenRenewerThread != null && tokenRenewerThread.isAlive()) {
+                tokenRenewerThread.interrupt();
+            }
+            udpThread.interrupt();
         }
 
         synchronized (serverInfoSyncObject) {
@@ -156,5 +240,13 @@ public class ClientAPI {
             this.serverIP = "";
             this.serverPort = null;
         }
+    }
+
+    public String getServerIPFromUDP() {
+        return serverIPFromUDP;
+    }
+
+    public Integer getServerPortFromUDP() {
+        return serverPortFromUDP;
     }
 }

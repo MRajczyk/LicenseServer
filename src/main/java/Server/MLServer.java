@@ -27,6 +27,7 @@ public class MLServer {
     private final Object licensesSyncObject = new Object();
     private License[] licenses;
     private Map<String, ArrayList<GrantedLicense>> activeLicenses = new HashMap<>();
+    private ArrayList<String> discoverList = new ArrayList<>();
 
     DateTimeFormatter df = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
 
@@ -134,6 +135,70 @@ public class MLServer {
         }
         System.out.println("Server is running..");
 
+        //udp thread
+        Runnable udpListener = () -> {
+            while(true) {
+                synchronized (shutdownSyncObject) {
+                    if(shutdownFlag) {
+                        return;
+                    }
+                }
+                //receive
+                int mcPort = 2323;
+                MulticastSocket udpSocket;
+                String message;
+                try {
+                    udpSocket = new MulticastSocket(null);
+                    udpSocket.setReuseAddress(true);
+                    InetSocketAddress address = new InetSocketAddress("0.0.0.0", mcPort);
+                    udpSocket.bind(address);
+                    udpSocket.setSoTimeout(10000);
+                    udpSocket.joinGroup(InetAddress.getByName("230.0.0.0"));
+                }
+                catch (IOException e) {
+                    System.out.println("Error occured while binding multicast receiver socket! Thread shutdown.");
+                    return;
+                }
+                byte[] buff = new byte[1024];
+                DatagramPacket pack = new DatagramPacket(buff, buff.length);
+                try {
+                    udpSocket.receive(pack);
+                    message = new String(buff, StandardCharsets.UTF_8);
+                } catch (IOException e) {
+                    udpSocket.close();
+                    continue;
+                }
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                //send tcp port
+                try {
+                    if(!message.startsWith("DISCOVER")) {
+                        MulticastSocket ms = new MulticastSocket();
+                        buff = ("nicht werken!").getBytes(StandardCharsets.UTF_8);
+                        DatagramPacket dp = new DatagramPacket(buff, buff.length, InetAddress.getByName("230.0.0.0"), 2323);
+                        ms.setTimeToLive(10);
+                        ms.send(dp);
+                        ms.close();
+                        continue;
+                    }
+                    discoverList.add("DISCOVER: " + pack.getAddress().toString());
+                    MulticastSocket ms = new MulticastSocket();
+                    buff = ("PORT:" + this.tcpPort).getBytes(StandardCharsets.UTF_8);
+                    DatagramPacket dp = new DatagramPacket(buff, buff.length, InetAddress.getByName("230.0.0.0"), 2323);
+                    ms.setTimeToLive(10);
+                    ms.send(dp);
+                    ms.close();
+                } catch (IOException e) {
+                    System.out.println("Error occured while sending mutlicast message");
+                }
+            }
+        };
+        Thread udpThread = new Thread(udpListener);
+        udpThread.start();
+
         //thread to get user input so nothing blocks
         Runnable inputListener = () -> {
             while(true) {
@@ -155,6 +220,10 @@ public class MLServer {
                                     System.out.println("\tIPAddr: " + gl.getIPaddress() + " | License Valid For (seconds) " + (gl.getValidUntil() - Instant.now().getEpochSecond()));
                                 });
                             });
+                            System.out.println("All DISCOVER packets received:");
+                            for(int i = 0; i < discoverList.size(); ++i) {
+                                System.out.println(i + ". " + discoverList.get(i));
+                            }
                         }
                         break;
                     case "s":
@@ -206,7 +275,7 @@ public class MLServer {
                 try {
                     Thread.sleep(569);
                 } catch (InterruptedException e) {
-                    System.out.println("Error with sleeping thread..zzz...");
+                    //
                 }
             }
         };

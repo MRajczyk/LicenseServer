@@ -8,21 +8,37 @@ public class ClientMain {
         String serverIP;
 
         Scanner scanner = new Scanner(System.in);
-        portLoop:
         while(true) {
-            System.out.println("Enter port for TCP connection");
+            System.out.println("Do you want to enter server data manually(1) or try to resolve it with UDP DISCOVER message(2)?");
             try {
-                port = Integer.parseInt(scanner.nextLine());
-                while(true) {
-                    System.out.println("Enter ip address of the server");
-                    try {
-                        serverIP = scanner.nextLine();
-                        api.start(serverIP, port);
-                        break portLoop;
-                    } catch (NumberFormatException e) {
-                        System.out.println("Invalid input, try again.");
+                int answer = Integer.parseInt(scanner.nextLine());
+                if(answer == 2) {
+                    System.out.println("Please wait while api connects to the server...");
+                    if(api.discoverMLServer()) {
+                        api.start(api.getServerIPFromUDP(), api.getServerPortFromUDP());
+                    } else {
+                        portLoop:
+                        while(true) {
+                            System.out.println("Enter port for TCP connection");
+                            try {
+                                port = Integer.parseInt(scanner.nextLine());
+                                while(true) {
+                                    System.out.println("Enter ip address of the server");
+                                    try {
+                                        serverIP = scanner.nextLine();
+                                        api.start(serverIP, port);
+                                        break portLoop;
+                                    } catch (NumberFormatException e) {
+                                        System.out.println("Invalid input, try again.");
+                                    }
+                                }
+                            } catch (NumberFormatException e) {
+                                System.out.println("Invalid input, try again.");
+                            }
+                        }
                     }
                 }
+                break;
             } catch (NumberFormatException e) {
                 System.out.println("Invalid input, try again.");
             }
