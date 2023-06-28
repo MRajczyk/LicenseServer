@@ -16,25 +16,25 @@ public class ClientMain {
                     System.out.println("Please wait while api connects to the server...");
                     if(api.discoverMLServer()) {
                         api.start(api.getServerIPFromUDP(), api.getServerPortFromUDP());
-                    } else {
-                        portLoop:
-                        while(true) {
-                            System.out.println("Enter port for TCP connection");
-                            try {
-                                port = Integer.parseInt(scanner.nextLine());
-                                while(true) {
-                                    System.out.println("Enter ip address of the server");
-                                    try {
-                                        serverIP = scanner.nextLine();
-                                        api.start(serverIP, port);
-                                        break portLoop;
-                                    } catch (NumberFormatException e) {
-                                        System.out.println("Invalid input, try again.");
-                                    }
+                    }
+                } else {
+                    portLoop:
+                    while(true) {
+                        System.out.println("Enter port for TCP connection");
+                        try {
+                            port = Integer.parseInt(scanner.nextLine());
+                            while(true) {
+                                System.out.println("Enter ip address of the server");
+                                try {
+                                    serverIP = scanner.nextLine();
+                                    api.start(serverIP, port);
+                                    break portLoop;
+                                } catch (NumberFormatException e) {
+                                    System.out.println("Invalid input, try again.");
                                 }
-                            } catch (NumberFormatException e) {
-                                System.out.println("Invalid input, try again.");
                             }
+                        } catch (NumberFormatException e) {
+                            System.out.println("Invalid input, try again.");
                         }
                     }
                 }
@@ -44,10 +44,10 @@ public class ClientMain {
             }
         }
 
-        api.setLicence("Radek", "9f3a08745c23449a53fc05d68eda1e1b");
+        api.setLicence("Guest", "adb831a7fdd83dd1e2a309ce7591dff8");
         TokenModel licenseToken = api.GetLicenseToken();
         System.out.println(licenseToken.LicenseUserName + " " + licenseToken.License + " " + licenseToken.Expired);
-        Thread.sleep(3000);
+        Thread.sleep(10000);
         licenseToken = api.GetLicenseToken();
         System.out.println(licenseToken.LicenseUserName + " " + licenseToken.License + " " + licenseToken.Expired);
 

@@ -230,7 +230,9 @@ public class ClientAPI {
             if(tokenRenewerThread != null && tokenRenewerThread.isAlive()) {
                 tokenRenewerThread.interrupt();
             }
-            udpThread.interrupt();
+            if(udpThread != null && udpThread.isAlive()) {
+                udpThread.interrupt();
+            }
         }
 
         synchronized (serverInfoSyncObject) {

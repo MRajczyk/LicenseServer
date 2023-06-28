@@ -46,7 +46,7 @@ public class MLServer {
                     if(generateLicenseKey(username).equals(licenseKey)) {
                         boolean flagIpOnWhitelist = false;
                         for(String ipAddr : lic.IPaddresses) {
-                            if(ipAddr.equals(ipAddress)) {
+                            if(ipAddr.equals(ipAddress) || ipAddr.equals("any")) {
                                 flagIpOnWhitelist = true;
                                 break;
                             }
