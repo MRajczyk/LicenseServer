@@ -254,10 +254,12 @@ public class MLServer {
                         for (GrantedLicense grantedLicense : v) {
                             //if not valid anymore, delete from licenses and re-add to licenses list
                             if(grantedLicense.getValidUntil() < Instant.now().getEpochSecond()) {
-                                licensesToBeRemoved.add(grantedLicense);
                                 for(License license : licenses) {
                                     if(license.LicenseUserName.equals(k)) {
-                                        license.License += 1;
+                                        if(license.ValidationTime != 0 ) {
+                                            licensesToBeRemoved.add(grantedLicense);
+                                            license.License += 1;
+                                        }
                                         break;
                                     }
                                 }
